@@ -1,0 +1,169 @@
+esphome:
+  name: kellyp-m5
+  friendly_name: KellyP-M5
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "SEnVH26dzDVfIhlFTTXIedO7EwqlwK8wE3XNmbLKfFE="
+
+ota:
+  - platform: esphome
+    password: "d66c1192eda8adee862eb2ac1a4f3604"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Kellyp-M5 Fallback Hotspot"
+    password: "Q6IbFkzxNSW6"
+
+mqtt:
+  topic_prefix: Kelly-PM5
+  broker: 192.168.9.33
+  port: 1883
+  username: mosquitto
+  password: ILoveSensors
+  discovery_prefix: homeassistant
+
+
+captive_portal:
+
+# Battery voltage measured through ADC1_CH2. PLUS2 has a voltage divider,
+# so reading needs to be multiplied by 2
+sensor:
+  - platform: adc
+    pin: GPIO38
+    attenuation: 12db
+    update_interval: 60s
+    name: "Battery Voltage"
+    filters:
+      - multiply: 2.0
+
+# Built-in 6-axis intertial measurement unit (IMU) that also includes a temperature sensor
+  - platform: mpu6886
+    i2c_id: bus_a
+    address: 0x68
+    update_interval: 10s
+    accel_x:
+      name: "MPU6886 Accel X"
+    accel_y:
+      name: "MPU6886 Accel Y"
+    accel_z:
+      name: "MPU6886 Accel z"
+    gyro_x:
+      name: "MPU6886 Gyro X"
+    gyro_y:
+      name: "MPU6886 Gyro Y"
+    gyro_z:
+      name: "MPU6886 Gyro z"
+    temperature:
+      name: "MPU6886 Temperature"
+
+binary_sensor:
+  # Turn on display backlight while Button A is pressed
+  - platform: gpio
+    pin:
+      number: GPIO37
+      inverted: false
+    name: ${upper_devicename} Button A
+    on_press:
+      then:
+        - light.turn_on: display_bl
+    on_release:
+      then:
+        - light.turn_off: display_bl
+
+  # Play 1000Hz tone through buzzer while Button B is pressed
+  - platform: gpio
+    pin:
+      number: GPIO39
+      inverted: true
+    name: ${upper_devicename} Button B
+    on_press:
+      then:
+        - output.turn_on: buzzer
+        - output.ledc.set_frequency:
+            id: buzzer
+            frequency: "1000Hz"
+        - output.set_level:
+            id: buzzer
+            level: "50%"
+
+    on_release:
+      then:
+        - output.turn_off: buzzer
+
+light:
+  - platform: monochromatic
+    output:  builtin_led
+    name: ${upper_devicename} Led
+    id: led1
+
+  - platform: monochromatic
+    output:  backlight
+    name: ${upper_devicename} Backlight
+    id: display_bl
+
+output:
+  - platform: ledc
+    pin: 10
+    inverted: true
+    id: builtin_led
+
+  - platform: ledc
+    pin: 2
+    inverted: false
+    id: buzzer
+
+  - platform: ledc
+    pin: 27
+    inverted: false
+    id: backlight
+
+spi:
+  clk_pin: GPIO13
+  mosi_pin: GPIO15
+
+i2c:
+   - id: bus_a
+     sda: GPIO21
+     scl: GPIO22
+     scan: True
+
+font:
+  - file: "gfonts://Roboto"
+    id: roboto
+    size: 18
+
+color:
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+
+# 1.14 inch, 135*240 Colorful TFT LCD, ST7789v2
+display:
+  - platform:  st7789v
+    model: TTGO TDisplay 135x240
+    cs_pin: GPIO5
+    dc_pin: GPIO14
+    reset_pin: GPIO12
+    rotation: 270
+    lambda: |-
+     it.print(80, 0, id(roboto), id(my_white), TextAlign::TOP_CENTER, "M5Stick Test");
+
+
+web_server:
+  version: 1
+  
